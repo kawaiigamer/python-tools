@@ -1,6 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
 import os,sys,urllib.request,re,socket
 
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    return [ atoi(c) for c in re.split('(\d+)', text) ]
 
 def RemoteContentHttpDownload(s):
  return urllib.request.urlopen( s,timeout = 10).read()
@@ -34,7 +39,8 @@ _url_base = _url[:_url.rindex('/')]
 _manga_name = _url[_url.rindex('/'):]
 rawCatalog = RemoteContentHttpDownload(_url)
 print("Downloaded:",len(rawCatalog),"bytes")
-chapterList = re.compile("<a href=\"(" + _manga_name + "/vol\d+/\d+)", re.M).findall(str(rawCatalog))
+chapterList = list(set(re.compile("<a href=\"(" + _manga_name + "/vol\d+/\d+)", re.M).findall(str(rawCatalog))))
+chapterList.sort(key=natural_keys)
 _manga_name = _manga_name[1:]
 print("Found:",len(chapterList),"chapters")
 _from = input_check(2,"start from",0,len(chapterList))
@@ -51,8 +57,3 @@ with ThreadPoolExecutor(max_workers=_threads) as executor:
 print("(ξ^∇^ξ) ホホホホホホホホホ")
 if len(sys.argv) == 1:
     input("Press Enter to continue...")
-    
-
-
-
-
