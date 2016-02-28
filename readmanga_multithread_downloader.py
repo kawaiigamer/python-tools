@@ -1,5 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
-import os,sys,urllib.request,re,socket
+import os,sys,urllib.request,re,socket,time
+
+def get_size(start_path = '.'):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total_size += os.path.getsize(fp)
+    return total_size
 
 def atoi(text):
     return int(text) if text.isdigit() else text
@@ -32,7 +40,9 @@ def ConcurrentMangaChapterDownload(task):
                  print (str(e), url[1:].replace("\\",""))
                  continue
              break
+    downloaded_size.append(get_size(_))
 
+downloaded_size = []
 socket.setdefaulttimeout(30)     
 _url = sys.argv[1] if len(sys.argv) > 1  else  input("url -> ") # "http://readmanga.me/bleach_"
 _url_base = _url[:_url.rindex('/')]
@@ -48,12 +58,14 @@ _to = input_check(3,"stop at",len(chapterList),len(chapterList))
 _threads = input_check(4,"threads",10,1000)
 os.makedirs(_manga_name,exist_ok=True)
 print("creating new folder :",_manga_name)
+start = time.time()
 with ThreadPoolExecutor(max_workers=_threads) as executor:
     i = _from
     while i < _to:
         executor.submit(ConcurrentMangaChapterDownload, chapterList[i])
         i += 1
     executor.shutdown()
+print(round(sum(downloaded_size)/1048576,3),"MB downloaded from",int(time.time() - start),"seconds")
 print("(ξ^∇^ξ) ホホホホホホホホホ")
 if len(sys.argv) == 1:
     input("Press Enter to continue...")
