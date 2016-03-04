@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from time import gmtime, strftime
 import os,sys,urllib.request,re,socket,time
 
 def get_size(start_path):
@@ -9,6 +10,9 @@ def get_size(start_path):
             total_size += os.path.getsize(fp)
     return total_size
 
+def get_time():
+      return "[".append(strftime("%Y-%m-%d %H:%M:%S", gmtime())).append("] ")
+    
 def atoi(text):
     return int(text) if text.isdigit() else text
 
@@ -29,7 +33,14 @@ def ConcurrentMangaChapterDownload(task):
     _ = task.split("/" )
     _ = _manga_name + "\\" +(_[len(_)-2]+"_"+_[len(_)-1])
     os.makedirs(_,exist_ok=True)
-    raw = str(RemoteContentHttpDownload(_url_base + task + "?mature=1"))
+    d=_url_base + task + "?mature=1"
+    while True:
+             try:
+                 raw = str(RemoteContentHttpDownload(d))
+             except Exception as e:
+                 print (get_time(),_,str(e),d)
+                 continue
+             break
     ImgLinks = re.findall("\'(.+?)'..(.+?)'.\"(.+?)\"",raw[raw.index('.init'):][:5500])
     for i in range(len(ImgLinks)):
         url  = ImgLinks[i][1] + ImgLinks[i][0] + ImgLinks[i][2]
@@ -37,7 +48,7 @@ def ConcurrentMangaChapterDownload(task):
              try:
                  urllib.request.urlretrieve(url[1:].replace("\\","") , _ + "\\" + url.split('/')[-1])
              except Exception as e:
-                 print (str(e), url[1:].replace("\\",""))
+                 print (get_time(),_,str(e), url[1:].replace("\\",""))
                  continue
              break
     downloaded_size.append(get_size(_))
@@ -48,11 +59,11 @@ _url = sys.argv[1] if len(sys.argv) > 1  else  input("url -> ") # "http://readma
 _url_base = _url[:_url.rindex('/')]
 _manga_name = _url[_url.rindex('/'):]
 rawCatalog = RemoteContentHttpDownload(_url)
-print("Downloaded:",len(rawCatalog),"bytes")
+print("downloaded:",len(rawCatalog),"bytes")
 chapterList = list(set(re.compile("<a href=\"(" + _manga_name + "/vol\d+/\d+)", re.M).findall(str(rawCatalog))))
 chapterList.sort(key=natural_keys)
 _manga_name = _manga_name[1:]
-print("Found:",len(chapterList),"chapters")
+print("found:",len(chapterList),"chapters")
 _from = input_check(2,"start from",0,len(chapterList))
 _to = input_check(3,"stop at",len(chapterList),len(chapterList))
 _threads = input_check(4,"threads",10,1000)
@@ -65,7 +76,9 @@ with ThreadPoolExecutor(max_workers=_threads) as executor:
         executor.submit(ConcurrentMangaChapterDownload, chapterList[i])
         i += 1
     executor.shutdown()
-print(round(sum(downloaded_size)/1048576,3),"MB downloaded from",int(time.time() - start),"seconds")
-print("(ξ^∇^ξ) ホホホホホホホホホ")
+size = round(sum(downloaded_size)/1048576,3)
+rtime = int(time.time() - start)
+print(size,"MB downloaded from",rtime,"seconds",round(size/rtime,3),"MB per second")
+#print("(ξ^∇^ξ) ホホホホホホホホホ")
 if len(sys.argv) == 1:
-    input("Press Enter to continue...")
+    input("press Enter to continue...")
