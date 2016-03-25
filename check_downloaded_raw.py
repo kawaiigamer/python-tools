@@ -19,6 +19,7 @@ while True:
 t=dirs(w)
 print("folders with file count < 15 :")
 for vol in t:
-    if dirc(w+'/'+vol) < 15:
-        print('|',vol)
+    files = dirc(w+'/'+vol)
+    if  files < 15:
+        print('|',vol,' -> ',files)
 input("press Enter to continue...")
