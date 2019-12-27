@@ -1,17 +1,21 @@
-import colorama,requests,os,time
+import colorama,requests,os,time,math,re
 from colorama import Fore, Back, Style
 from lxml import etree
 from datetime import datetime,timedelta
 
 #---------------------------------------------------------
-RSS_URL = 'https://www.fl.ru/rss/all.xml?category=5'
+RSS_URLS = (
+    'https://www.fl.ru/rss/all.xml?category=5',
+    #'https://www.fl.ru/rss/all.xml?category=23&subcategory=225' # Мобильные приложения - Google Android
+    #'https://www.fl.ru/rss/all.xml?category=2&subcategory=9', # Разработка сайтов - Веб-программирование
+           )
 MAX_PRICE_LEN = 5
-TITLE_OFFSET = 11
+TITLE_OFFSET = 12
 KEYWORDS = ('python', 'telegram', 'телеграм','c#')
 UPDATE_TIMEOUT = 60
 #---------------------------------------------------------
 
-def fl_rss_parse(rss : str) -> list: # price,title,description,time_diff_str
+def fl_rss_parse(rss : str) -> list: # price,title,description,time_diff
     elements = []
     root = etree.fromstring(rss)
     for item in root.xpath('//item'):
@@ -22,13 +26,22 @@ def fl_rss_parse(rss : str) -> list: # price,title,description,time_diff_str
         else:
               price = 'П/д'
         description = item.xpath('./description')[0].text.rstrip()
+
         gmt_time = datetime.strptime(item.xpath('./pubDate')[0].text,"%a, %d %b %Y %H:%M:%S %Z")
-        diff_from_now = datetime.fromtimestamp(time.time()) - ( gmt_time + timedelta(hours=3) )
-        time_diff_str = str(diff_from_now)[:-10] + " "
-        elements.append((price,title,description,time_diff_str))
+        seconds_from_now = (datetime.fromtimestamp(time.time()) - ( gmt_time + timedelta(hours=3) ) ).total_seconds()
+        minutes_from_now = int( math.floor(seconds_from_now / 60) )
+        diff_hours = str ( int( minutes_from_now / 60 ) )
+        diff_minutes =  str ( int( minutes_from_now % 60 ) )
+        if len(diff_hours) == 1:
+            diff_hours = '0' + diff_hours
+        if len(diff_minutes) == 1:
+            diff_minutes = '0' + diff_minutes
+        time_diff =  diff_hours + ':' + diff_minutes + ' '
+
+        elements.append((price,title,description,time_diff))
     return elements
 
-def display_fl_element(e : tuple) -> None:
+def fl_display_element(e : tuple) -> None:
     if len(e[0]) > MAX_PRICE_LEN:
         return
     spaces = ''.join(' ' for i in range(0, TITLE_OFFSET- (len(e[0])+len(e[3])  )))
@@ -40,16 +53,25 @@ def display_fl_element(e : tuple) -> None:
         print(e[1])
 
 
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+
 def mainloop() -> None:
     colorama.init(autoreset=True)
     while True:
         try:
-            r = requests.get(RSS_URL)
-            elements = fl_rss_parse(r.text.encode())
+            elements = []
+            for rss_url in RSS_URLS:
+                r = requests.get(rss_url)
+                elements += fl_rss_parse(r.text.encode())
             os.system('cls')
-            print('Updated',datetime.now().strftime("%Y-%m-%d %H:%M"))
+            print('Updated',datetime.now().strftime("%Y-%m-%d %H:%M"),'Results',len(elements))
+            elements = sorted(elements, key=lambda tup: natural_keys(tup[3]))
             for e in reversed(elements):
-                display_fl_element(e)
+                fl_display_element(e)
         except Exception as e:
             print('Ошибка', e)
         finally:
