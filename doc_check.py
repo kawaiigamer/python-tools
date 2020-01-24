@@ -2,8 +2,8 @@ import requests,json,ctypes,time
 
 tasks = [
     # speciality_id, clinic_id, name '' - for any name, description
-    (40,279,'','Невролог'),
-    (2122,314,'Гусаров','Дерматолог'),
+    (40,279,'','desc 1'),
+    (2122,314,'Name','desc 2'),
     ]
 
     
@@ -26,7 +26,7 @@ def doc_check():
                   data="speciality_form-speciality_id="+str(task[0])+"&speciality_form-clinic_id=+"+str(task[1])+"&speciality_form-patient_id=&speciality_form-history_id=",
                   headers=h)
         resp = json.loads(r.text)
-        for doc in resp['response']:
+        for doc in resp.get('response',[]):
             if doc['CountFreeTicket'] is not 0 and task[2] in doc['Name']:
                 ctypes.windll.user32.MessageBoxW(0, "New ticket avalible!\n"+task[3]+"  match: " + task[2], time.ctime(), 4096)
                 if task[2] is '':
