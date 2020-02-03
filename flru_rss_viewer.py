@@ -12,6 +12,7 @@ RSS_URLS = (
 MAX_PRICE_LEN = 5
 TITLE_OFFSET = 12
 KEYWORDS = ('python', 'telegram', 'телеграм','c#')
+IGNORE_KEYWORDS = ('битрикс','bitrix')
 UPDATE_TIMEOUT = 60
 #---------------------------------------------------------
 
@@ -41,9 +42,11 @@ def fl_rss_parse(rss : str) -> list: # price,title,description,time_diff
         elements.append((price,title,description,time_diff))
     return elements
 
-def fl_display_element(e : tuple) -> None:
+def fl_display_element(e : tuple) -> bool:
     if len(e[0]) > MAX_PRICE_LEN:
-        return
+        return False
+    if any(keyword in e[1].lower() for keyword in IGNORE_KEYWORDS):
+        return False
     spaces = ''.join(' ' for i in range(0, TITLE_OFFSET- (len(e[0])+len(e[3])  )))
     print(Fore.RED + e[3], end='')
     print(Fore.GREEN + e[0] + spaces, end='')
@@ -51,6 +54,7 @@ def fl_display_element(e : tuple) -> None:
         print(Fore.BLUE + e[1])
     else:
         print(e[1])
+    return True
 
 
 def atoi(text):
@@ -68,10 +72,11 @@ def mainloop() -> None:
                 r = requests.get(rss_url)
                 elements += fl_rss_parse(r.text.encode())
             os.system('cls')
-            print('Updated',datetime.now().strftime("%Y-%m-%d %H:%M"),'Results',len(elements))
             elements = sorted(elements, key=lambda tup: natural_keys(tup[3]))
+            filtered = 0
             for e in reversed(elements):
-                fl_display_element(e)
+                if not fl_display_element(e) : filtered += 1
+            print('Updated', datetime.now().strftime("%Y-%m-%d %H:%M"), 'Results', len(elements),'Filtered',filtered)
         except Exception as e:
             print('Ошибка', e)
         finally:
