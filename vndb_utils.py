@@ -1,23 +1,29 @@
-import urllib.request,re
+import urllib.request
+import re
 
-def RemoteContentHttpDownload(s):
- return str(urllib.request.urlopen( s,timeout = 10).read())
+from typing import List, Tuple
 
-def ParseCharAll(s,w): # "https://vndb.org/i296?m=0;fil=tagspoil-0.trait_inc-296;p="
-    Links = []
-    for i in range(1,w):
-        h=RemoteContentHttpDownload(s + str(i))
-        Links += re.findall("tc2\"><a href=\"(.+?)\" title=\".+?\">(.+?)<\/a><b",h)
-    return Links
 
-def GetCharDetal(arr): 
-     New = []
-     for i in range(len(arr)):
-         h=RemoteContentHttpDownload("https://vndb.org" + arr[i][0])
-         m = re.search("(\/v\d+\/chars)", h).group(1)
-         try:
-             d = "https://" + re.search("rc=\"//(.+?)\" a", h).group(1)
-         except:
-             d = ""
-         New.append(   (arr[i][0],arr[i][1],m,d)  )
-     return New
+def remote_content_http_download(url, timeout: int = 15) -> str:
+    return str(urllib.request.urlopen(url, timeout=timeout).read())
+
+
+def parse_char_all(url: str, count: int) -> List[List]:  # "https://vndb.org/i296?m=0;fil=tagspoil-0.trait_inc-296;p="
+    links = []
+    for i in range(1, count):
+        text = remote_content_http_download("%s%d" % (url, i))
+        links += re.findall("tc2\"><a href=\"(.+?)\" title=\".+?\">(.+?)<\/a><b", text)
+    return links
+
+
+def get_char_detal(chars: List[List]) -> List[Tuple]:
+    new = []
+    for i in range(len(chars)):
+        text = remote_content_http_download("https://vndb.org%s" % chars[i][0])
+        m = re.search("(\/v\d+\/chars)", text).group(1)
+        try:
+            link = "https://%s" % re.search("rc=\"//(.+?)\" a", text).group(1)
+        except Exception:
+            link = ""
+        new.append((chars[i][0], chars[i][1], m, link))
+    return new

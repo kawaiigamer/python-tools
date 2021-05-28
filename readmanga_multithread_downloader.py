@@ -6,7 +6,7 @@ import socket
 
 from concurrent.futures import ThreadPoolExecutor
 from time import gmtime, strftime, time
-from typing import List, Tuple, Union
+from typing import List, Optional, Union
 
 
 def get_size(start_path: str) -> int:
@@ -68,35 +68,52 @@ def remove_url_arguments(url: str) -> str:
     return url[:args_position] if args_position != -1 else url
 
 
+def download_page(url: str, retries_count: int) -> Optional[str]:
+    retries = 0
+    while retries < retries_count:
+        try:
+            retries += 1
+            return str(remote_content_http_download(url))
+        except Exception as e:
+            print("%s Exception while downloading page(try %d/%d) %s: %s" %
+                  (get_formatted_time(), retries, retries_count, url, e))
+
+
+def download_image(url: str, save_path: str, retries_count: int) -> bool:
+    retries = 0
+    while retries < retries_count:
+        try:
+            retries += 1
+            urllib.request.urlretrieve(url, save_path)
+            return True
+        except Exception as e:
+            print("%s Exception while downloading image(try %d/%d) %s: %s" %
+                  (get_formatted_time(), retries, retries_count, url, e))
+    return False
+
+
 def concurrent_manga_chapter_download(task: str, page_download_retries_count: int,
                                       img_download_retries_count: int, downloaded_size_list: List):
-    _ = task.split("/")  # task - /asura/vol1/1
-    chapter_directory_name = "%s/%s_%s" % (manga_name, _[len(_) - 2], _[len(_) - 1])
+    task_parts = task.split("/")  # task - /asura/vol1/1
+    chapter_directory_name = "%s/%s_%s" % (manga_name, task_parts[len(task_parts) - 2], task_parts[len(task_parts) - 1])
     os.makedirs(chapter_directory_name, exist_ok=True)
     print("%s Creating new directory : %s" % (get_formatted_time(), chapter_directory_name))
 
     final_url = "%s%s?mature=1" % (domain, task)
-    while True:  # TODO: retrys
-        try:
-            raw = str(remote_content_http_download(final_url))
-        except Exception as e:
-            print("%s Exception in task %s while downloading %s: %s" %
-                  (get_formatted_time(), task, final_url, e))
-            continue
-        break
+    chapter_page_text = download_page(final_url, page_download_retries_count)
+    if not chapter_page_text:
+        print("%s Task aborted: %s, cant download chapter page" %(get_formatted_time(), task))
+        return
 
-    chapter_img_urls = re.findall("\'(.+?)'..(.+?)'.\"(.+?)\"", raw[raw.index('.init'):][:5500])
+    chapter_img_urls = re.findall("\'(.+?)'..(.+?)'.\"(.+?)\"",
+                                  chapter_page_text[chapter_page_text.index('.init'):][:5500])
     for i in range(len(chapter_img_urls)):
-        url = chapter_img_urls[i][1] + chapter_img_urls[i][0] + chapter_img_urls[i][2]
-        while True:
-            try:
-                image_url = url[1:].replace("\\", "")
-                image_save_path = remove_url_arguments(chapter_directory_name + "\\" + url.split('/')[-1])
-                urllib.request.urlretrieve(image_url, image_save_path)
-            except Exception as e:
-                print(get_formatted_time(), _, str(e), url[1:].replace("\\", ""))
-                continue
-            break
+        image_url = chapter_img_urls[i][0].replace("\\", "") + chapter_img_urls[i][2]
+        image_save_path = remove_url_arguments("%s/%s" % (chapter_directory_name, image_url.split('/')[-1]))
+        success_flag = download_image(image_url, image_save_path, img_download_retries_count)
+        if not success_flag:
+            print("%s Task: %s, cant download image: %s" % (get_formatted_time(), task, image_url))
+
     downloaded_size_list.append(get_size(chapter_directory_name))
 
 
@@ -141,6 +158,6 @@ with ThreadPoolExecutor(max_workers=threads) as executor:
 download_size_mb = round(sum(downloaded_size) / 1048576, 3)
 download_time = int(time() - start_time)
 print("%f MB downloaded from %d seconds, %f MB per second" %
-      (download_size_mb, download_time, round(download_size_mb / download_time, 3)))
+      (download_size_mb, download_time, round(download_size_mb / download_time if download_time else 1, 3)))
 if len(sys.argv) != 5:  # If user makes input
     input("press Enter to continue...")
