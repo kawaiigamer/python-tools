@@ -1,30 +1,28 @@
-import random,statistics
+import random
+import statistics
 
-winrate = 0.51
-iterations = 100
+WINRATE = 0.51
+ITERATIONS = 100
+WINSTREAK_ALLOWED_UNTIL = 5 * 5  # below Rank 5
 
-games = [0]*iterations
-passwinstreak = 5*5 # below Rank 5
-for x in range(iterations):
-    
-    #                 1-10    11-15 => 15 rank
-    ladderPosition =  5*10  +  4*5
-    winstrek = 0
+games = [0] * ITERATIONS
+for x in range(ITERATIONS):
+    #                  1-10    11-15 => Starting at 15 Rank
+    ladder_position = 5 * 10 + 4 * 5
+    winstreak = 0
     
     while True:
         games[x] = games[x] + 1
-        if random.random() <= winrate:
-            winstreak = winstrek + 1
-            ladderPosition = ladderPosition - 1
-            if winstrek >= 2 and ladderPosition > passwinstreak:
-                ladderPosition = ladderPosition - 1
+        if random.random() <= WINRATE:
+            winstreak += 1
+            ladder_position -= 1
+            if winstreak >= 2 and ladder_position > WINSTREAK_ALLOWED_UNTIL:
+                ladder_position -= 1
         else:
             winstreak = 0
-            ladderPosition = ladderPosition + 1
-        if ladderPosition is 0:
+            ladder_position += 1
+        if ladder_position == 0:
             break
     
-
-
-print("Total games (mean of " + str(iterations) + " iterations): "+ str(statistics.mean(games)))
-input()
+print("Total games (mean of %d iterations): %f" % (ITERATIONS, statistics.mean(games)))
+input("Press Enter to continue...")
