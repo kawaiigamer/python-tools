@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 function: Callable = getattr(lib, args.function)
 
-founded = 0
+found = 0
 rounds = 0
 begin_text = args.begin.encode('utf-8')
 middle_text = args.middle.encode('utf-8')
@@ -32,11 +32,11 @@ end_text = args.end.encode('utf-8')
 print("%s Generation started!" % get_formatted_time())
 
 start_time = time()
-while founded < args.limit:
+while found < args.limit:
     rounds += 1
     text: bytes = begin_text + middle_text * rounds + end_text
     hash: str = function(text).hexdigest()
     if hash.endswith(args.suffix) and hash.startswith(args.prefix):
-        founded += 1
+        found += 1
         print("%s Result %d, rounds %d sec %f\nHash(%s): %s\nText(%d): %s\n" %
-             (get_formatted_time(), founded, rounds, time() - start_time, args.function, hash, len(text), text.decode('utf-8')))
+              (get_formatted_time(), found, rounds, time() - start_time, args.function, hash, len(text), text.decode('utf-8')))

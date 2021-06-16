@@ -50,4 +50,3 @@ def f2b_print_data_list():
 
 if __name__ == "__main__":
     f2b_print_data_list()
-
