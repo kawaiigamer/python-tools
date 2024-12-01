@@ -10,29 +10,43 @@ from typing import Tuple, Optional, List
 
 class KladImageGenerator:
 
-    levm_lower_green = np.array([25, 20, 35], dtype="uint8")
-    levm_upper_green = np.array([90, 225, 255], dtype="uint8")
-    levm_min_counter_area = 350
-    levm_fill_colour = (255, 255, 0)
+    green_lower = np.array([25, 20, 35], dtype="uint8")
+    green_upper = np.array([90, 225, 255], dtype="uint8")
+    min_counter_percent = 0.0003907
+    fill_colour = (255, 255, 0)
     KEY_S = 115
     KEY_R = 114
     google_panorama_height = 8192
     google_panorama_width = 16384
+    google_panorama_split_height_s = 2000
+    google_panorama_split_height = 6000
+    save_folder_name = "ai_results"
+    text_position_percent_height = 0.95031  #0.12533 #0.02533
+    text_position_percent_width = 0.00609
+    resize_width = 1024
+    resize_height = 512
 
-    def __draw_utf8_text(self, image: np.ndarray, text: str) -> np.ndarray:
+    def __draw_utf8_text(self, image: np.ndarray, text: str, size: int) -> np.ndarray:
         height, width, _ = image.shape
         pil_image = Image.fromarray(image)
-        font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", 32)
+        font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", size)
         draw = ImageDraw.Draw(pil_image)
-        draw.text((30, height - 80), text, font=font, fill=(0, 0, 255), spacing=6)
+        draw.text((width*self.text_position_percent_width,
+                   height * self.text_position_percent_height,),
+                  text, font=font, fill=(0, 0, 255), spacing=6)
         return np.asarray(pil_image)
 
-    def __gen_utf8_text(self, coords: str) -> str:
-        return f"{coords}\n{random.choice("Меф,Мет".split(","))} {random.randint(1, 5)}г Прикоп {random.randint(2, 7)}см {random.choice("Синяя,Красная,Белая,Чёрная".split(","))} иза"
+    def __gen_utf8_text(self, cords: str) -> str:
+        substance = "Меф,Мет".split(",")
+        type = "Прикоп,Прикоп".split(",")
+        colour = "Синяя,Красная,Белая,Чёрная".split(",")
+        return f"{cords}\n{random.choice(substance)} {random.randint(1, 5)}г {random.choice(type)} {random.randint(2, 7)}см {random.choice(colour)} иза"
 
-    def __resize_img_by_scale(self, image: np.ndarray, scale: float = 1.5) -> np.ndarray:
+    def __resize_img_by_scale(self, image: np.ndarray) -> np.ndarray:
         height, width, _ = image.shape
-        return cv2.resize(image, (int(width / scale), int(height / scale)))
+        scale_w = width / self.resize_width
+        scale_h = height / self.resize_height
+        return cv2.resize(image, (int(width / scale_w), int(height / scale_h)))
 
     def __draw_arrow(self, image: np.ndarray, x, y, length=200) -> np.ndarray:
         return cv2.arrowedLine(image, (x + length, y + length), (x, y), (0, 0, 255), 3)
@@ -45,13 +59,14 @@ class KladImageGenerator:
         hsv_image[0:int(height / 3), 0:width] = (0, 0, 0)
 
         # Находим контуры с площадью больше порога
-        mask = cv2.inRange(hsv_image, self.levm_lower_green, self.levm_upper_green)
+        min_counter_area = height*width*self.min_counter_percent
+        mask = cv2.inRange(hsv_image, self.green_lower, self.green_upper)
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        size_filtered_counters = list(filter(lambda c: cv2.contourArea(c) > self.levm_min_counter_area, contours))
+        size_filtered_counters = list(filter(lambda c: cv2.contourArea(c) > min_counter_area, contours))
 
         # Заполнить на копии оригинального изображения отфильтрованные контуры
         img_filled_areas = raw_img.copy()
-        cv2.drawContours(img_filled_areas, size_filtered_counters, -1, self.levm_fill_colour, thickness=cv2.FILLED)
+        cv2.drawContours(img_filled_areas, size_filtered_counters, -1, self.fill_colour, thickness=cv2.FILLED)
 
         # Игнорируем верхнюю половину изображения
         img_for_choosing_point = img_filled_areas.copy()
@@ -59,19 +74,19 @@ class KladImageGenerator:
 
         # Закрасить чёрным всё, кроме контуров
         hsv_bitwise_and = cv2.bitwise_and(raw_img, raw_img, mask=mask)
-
         # Итог
         result = raw_img.copy()
         # Выбираем случайный контур
-        y_coords_array, x_coords_array = np.where(np.all(img_for_choosing_point == self.levm_fill_colour, axis=2))
-        # Выбираем случайную точку в выбранном контуре
-        i = random.randint(0, len(x_coords_array))
-        cx, cy = x_coords_array[i], y_coords_array[i]
-        # Рисуем стрелку
-        result = self.__draw_arrow(result, cx, cy, 200)
+        y_coords_array, x_coords_array = np.where(np.all(img_for_choosing_point == self.fill_colour, axis=2))
+        if x_coords_array.size.real:
+            # Выбираем случайную точку в выбранном контуре
+            i = random.randint(0, len(x_coords_array))
+            cx, cy = x_coords_array[i], y_coords_array[i]
+            # Рисуем стрелку
+            result = self.__draw_arrow(result, cx, cy, 200)
         # Рисуем текст
         plib_path = pathlib.Path(path)
-        result = self.__draw_utf8_text(result, self.__gen_utf8_text(plib_path.name if plib_path else ""))
+        result = self.__draw_utf8_text(result, self.__gen_utf8_text((plib_path.name if plib_path else "").split('_')[0]), 32 if height < 2048 else 82)
 
         return raw_img, result, hsv_bitwise_and, img_filled_areas
 
@@ -85,6 +100,7 @@ class KladImageGenerator:
         cv2.imshow(description, np.concatenate(
             (np.concatenate((converted_imgs[0], converted_imgs[2]), axis=1),
              np.concatenate((converted_imgs[1], converted_imgs[3]), axis=1)), axis=0))
+        cv2.moveWindow(description, 80, 60)
         key = cv2.waitKey(0)
         cv2.destroyAllWindows()
         return key
@@ -94,14 +110,15 @@ class KladImageGenerator:
         raw_height, raw_width, _ = raw_img.shape
         splitted_imgs = []
         if raw_height == self.google_panorama_height and raw_width == self.google_panorama_width:
-            splitted_imgs.append(raw_img[0:int(raw_height / 2), 0:int(raw_width / 2)])
-            splitted_imgs.append(raw_img[int(raw_height / 2):raw_height, int(raw_width / 2):raw_width])
+            splitted_imgs.append(raw_img[self.google_panorama_split_height_s:self.google_panorama_split_height, 0:int(raw_width / 3)])
+            splitted_imgs.append(raw_img[self.google_panorama_split_height_s:self.google_panorama_split_height, int(raw_width / 3):int((raw_width / 3)*2)])
+            splitted_imgs.append(raw_img[self.google_panorama_split_height_s:self.google_panorama_split_height, int((raw_width / 3)*2):raw_width])
         else:
             splitted_imgs.append(raw_img)
         return splitted_imgs
 
     def __mianloop(self, path: str):
-        for img in self.__split_google_panorama(path):
+        for i, img in enumerate(self.__split_google_panorama(path)):
             while True:
                 imgs = self.__process_image(img, path)
                 ret_key = self.__display_4_imgs_window(imgs,
@@ -110,10 +127,11 @@ class KladImageGenerator:
                     continue
                 elif ret_key == self.KEY_S:
                     if parsed_path := pathlib.Path(path):
-                        img_name = parsed_path.name
-                        parsed_path = parsed_path.parent / "ai_results"
+                        img_stem = parsed_path.stem
+                        img_suffix = parsed_path.suffix
+                        parsed_path = parsed_path.parent / self.save_folder_name
                         parsed_path.mkdir(parents=True, exist_ok=True)
-                        cv2.imwrite(str(parsed_path / img_name), imgs[1] if len(imgs) > 1 else imgs[0])
+                        cv2.imwrite(str(parsed_path / f"{img_stem}_{i}.{img_suffix}"), imgs[1] if len(imgs) > 1 else imgs[0])
                 break
 
     def process_folder(self, path: str):
@@ -122,6 +140,9 @@ class KladImageGenerator:
 
 
 kig = KladImageGenerator()
+scale = 1.1
+kig.resize_width = int(kig.resize_width * scale)
+kig.resize_height = int(kig.resize_height * scale)
 kig.process_folder("./ai_results/*.jpg")
 
 #
