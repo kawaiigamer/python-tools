@@ -6,7 +6,6 @@ from typing import List
 class GooglePanaromaMultithreadDownloaderer:
 
     debug: bool
-    max_threads: int
     save_path: str
 
     def __int__(self, debug: bool = True, save_path: str = 'ai_results/'):
